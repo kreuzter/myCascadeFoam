@@ -1,0 +1,23 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      myDict;
+}
+
+functions
+{   /*
+    If typeDf > 1, the p field is required by the distribution function object.
+    In that case (Df > 1): run with postProcess -dict system/preproDict.
+    */
+
+    readFields1
+    {
+        type        readFields;
+        libs        (fieldFunctionObjects);
+        fields      (p);
+    }
+
+    #include "FO_distribution"
+}

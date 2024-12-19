@@ -27,8 +27,8 @@ distribution
     // - geometry
     //   - angles: these are connected, see documentation
     const scalar betas     = degToRad(138.51);
-    const scalar gamma_c   = pi() - betas ;
-    const scalar gamma     = betas - pi()/2;
+    const scalar gamma_c   = Foam::constant::mathematical::pi - betas ;
+    const scalar gamma     = betas - Foam::constant::mathematical::pi/2;
 
     //   - lengths 
     const scalar trueChord  = 0.09;
@@ -40,8 +40,8 @@ distribution
     // kobra
     // - geometry
     //   - angles: these are connected, see documentation
-    const scalar betas     = pi()/2;
-    const scalar gamma_c   = pi()/2;
+    const scalar betas     = Foam::constant::mathematical::pi/2;
+    const scalar gamma_c   = Foam::constant::mathematical::pi/2;
     const scalar gamma     =      0;
 
     //   - lengths 
@@ -54,7 +54,7 @@ distribution
     const int    typeDf   = 1;
     const scalar a        = -0.25;
     const scalar b        =  1.25;
-    const scalat c        =  1e-3; // minimum distance from the wall for non zero fluxes
+    const scalar c        =  1e-3; // minimum distance from the wall for non zero fluxes
 
     const scalar dist_min = a*axialChord;
     const scalar dist_max = b*axialChord;   
@@ -91,8 +91,6 @@ distribution
       );
 
       wallDistance = wallDist(mesh()).y();
-      const volVectorField& U = mesh().lookupObject<volVectorField>("U");
-      const volScalarField& p = mesh().lookupObject<volScalarField>("p");
 
       forAll(cCenters, cellI)
       {
@@ -103,18 +101,32 @@ distribution
 
         if (   x_ax >= dist_min && x_ax <= dist_max && wallDistance[cellI] > 1e-3 ) 
         {
-          switch(expression) {
-          case typeDf == 1:
+          switch(typeDf) {
+          case 1:
             distribution[cellI] =  1.0;
             break;
-          case typeDf == 2:
-            if ( p[cellI] > isenTotPressure *pow(2/(1+ratioSpecHeats), ratioSpecHeats/(ratioSpecHeats-1)) ){
+          case 2: {
+            const volScalarField& p_case2 = mesh().lookupObject<volScalarField>("p");
+            if ( p_case2[cellI] > isenTotPressure *pow(2/(1+ratioSpecHeats), ratioSpecHeats/(ratioSpecHeats-1)) ){
               distribution[cellI] =  1.0;
             }
             break;
-          case typeDf == 3:
+            }
+          case 3:{
+            const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+            volScalarField::Boundary& pb = const_cast<volScalarField*>(&p)->boundaryFieldRef();
+  
+            label inletId = mesh().boundaryMesh().findPatchID("inlet");
+            label outletId = mesh().boundaryMesh().findPatchID("outlet");
+            
+            const scalarField& magSfIn  = mesh().magSf().boundaryField()[ inletId];
+            const scalarField& magSfOut = mesh().magSf().boundaryField()[outletId];
+  
+            const scalar p1 = gSum(pb[ inletId]*magSfIn )/gSum(magSfIn );
+            const scalar p2 = gSum(pb[outletId]*magSfOut)/gSum(magSfOut);
             distribution[cellI] =  (p[cellI] - p1)/(p2-p1);
             break;
+            }
           }         
         }
       }
@@ -122,4 +134,3 @@ distribution
       Info << "Distribution was computed and written." << endl;
   #};
 }
-
