@@ -1,0 +1,5 @@
+linux64GccDPInt32Opt/
+lnInclude/
+
+*.so
+*.dep
