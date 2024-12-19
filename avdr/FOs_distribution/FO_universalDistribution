@@ -26,7 +26,7 @@ distribution
     // schreiber 84
     // - geometry
     //   - angles: these are connected, see documentation
-    const scalar betas     = degToRad(138.51);
+    const scalar betas     = 138.51 * Foam::constant::mathematical::pi/180;
     const scalar gamma_c   = Foam::constant::mathematical::pi - betas ;
     const scalar gamma     = betas - Foam::constant::mathematical::pi/2;
 
@@ -39,9 +39,7 @@ distribution
 
     // kobra
     // - geometry
-    //   - angles: these are connected, see documentation
-    const scalar betas     = Foam::constant::mathematical::pi/2;
-    const scalar gamma_c   = Foam::constant::mathematical::pi/2;
+    const scalar gamma_c   = 38.35 * Foam::constant::mathematical::pi/180;
     const scalar gamma     =      0;
 
     //   - lengths 
@@ -51,7 +49,7 @@ distribution
     const scalar axialChord = trueChord*sin(gamma_c);
 
     // - distribution
-    const int    typeDf   = 1;
+    const int    typeDf   =  1;
     const scalar a        = -0.25;
     const scalar b        =  1.25;
     const scalar c        =  1e-3; // minimum distance from the wall for non zero fluxes
