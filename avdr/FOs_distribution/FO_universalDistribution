@@ -1,0 +1,125 @@
+distribution
+{
+  libs (utilityFunctionObjects);
+  type coded;
+  name computeDistribution;
+    
+  executeControl    timeStep;
+  executeInterval   1000;
+  writeControl      timeStep;
+  writeInterval     1000;
+  
+  codeOptions
+  #{
+	  -I$(LIB_SRC)/finiteVolume/lnInclude \
+	  -I$(LIB_SRC)/meshTools/lnInclude \
+  #};
+  codeInclude
+  #{
+    #include "wallDist.H"
+  #};
+  codeData
+  #{
+    const scalar ratioSpecHeats  = 1.4;
+    const scalar isenTotPressure = 1.0e5;
+    /*
+    // schreiber 84
+    // - geometry
+    //   - angles: these are connected, see documentation
+    const scalar betas     = degToRad(138.51);
+    const scalar gamma_c   = pi() - betas ;
+    const scalar gamma     = betas - pi()/2;
+
+    //   - lengths 
+    const scalar trueChord  = 0.09;
+    const scalar pitch      = trueChord*0.621; // not neccessarily, property of the DLR cascade
+
+    const scalar axialChord = trueChord*sin(gamma_c);
+    */
+
+    // kobra
+    // - geometry
+    //   - angles: these are connected, see documentation
+    const scalar betas     = pi()/2;
+    const scalar gamma_c   = pi()/2;
+    const scalar gamma     =      0;
+
+    //   - lengths 
+    const scalar trueChord  = 0.100;
+    const scalar pitch      = 0.075; // not neccessarily, property of the DLR cascade
+
+    const scalar axialChord = trueChord*sin(gamma_c);
+
+    // - distribution
+    const int    typeDf   = 1;
+    const scalar a        = -0.25;
+    const scalar b        =  1.25;
+    const scalat c        =  1e-3; // minimum distance from the wall for non zero fluxes
+
+    const scalar dist_min = a*axialChord;
+    const scalar dist_max = b*axialChord;   
+  #};
+  codeWrite
+  #{
+      const volVectorField& cCenters = mesh().C(); 
+      volScalarField distribution
+      (
+        IOobject
+      (
+        "distribution",
+        "constant",
+        mesh(),
+        IOobject::NO_READ,
+        IOobject::AUTO_WRITE
+      ),
+        mesh(),
+        dimensionedScalar("distribution", dimless, 0.0)
+      );
+
+      volScalarField wallDistance
+      (
+        IOobject
+      (
+        "wallDistance",
+        mesh().time().timeName(),
+        mesh(),
+        IOobject::NO_READ,
+        IOobject::AUTO_WRITE
+      ),
+        mesh(),
+        dimensionedScalar("wallDistance", dimensionSet(0,1,0,0,0,0,0), 0)
+      );
+
+      wallDistance = wallDist(mesh()).y();
+      const volVectorField& U = mesh().lookupObject<volVectorField>("U");
+      const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+
+      forAll(cCenters, cellI)
+      {
+        scalar x = cCenters[cellI][0];
+        scalar y = cCenters[cellI][1];
+        // rotate from x,y to ax,tan (= x_ax, y_ax)
+        scalar x_ax = cos(gamma) * x + sin(gamma) * y;
+
+        if (   x_ax >= dist_min && x_ax <= dist_max && wallDistance[cellI] > 1e-3 ) 
+        {
+          switch(expression) {
+          case typeDf == 1:
+            distribution[cellI] =  1.0;
+            break;
+          case typeDf == 2:
+            if ( p[cellI] > isenTotPressure *pow(2/(1+ratioSpecHeats), ratioSpecHeats/(ratioSpecHeats-1)) ){
+              distribution[cellI] =  1.0;
+            }
+            break;
+          case typeDf == 3:
+            distribution[cellI] =  (p[cellI] - p1)/(p2-p1);
+            break;
+          }         
+        }
+      }
+      distribution.write();
+      Info << "Distribution was computed and written." << endl;
+  #};
+}
+

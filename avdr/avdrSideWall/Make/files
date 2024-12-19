@@ -1,0 +1,4 @@
+avdrSideWallFvPatchVectorField.C
+
+LIB = $(FOAM_USER_LIBBIN)/myCascadeFoam
+
