@@ -30,7 +30,7 @@ distribution
 
     //   - lengths 
     const scalar trueChord  = 0.100;
-    const scalar pitch      = 0.075; // not neccessarily, property of the DLR cascade
+    const scalar pitch      = 0.075;
 
     const scalar axialChord = trueChord*sin(gamma_c);
 
