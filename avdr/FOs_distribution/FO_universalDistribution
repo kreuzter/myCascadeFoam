@@ -22,20 +22,6 @@ distribution
   #{
     const scalar ratioSpecHeats  = 1.4;
     const scalar isenTotPressure = 1.0e5;
-    /*
-    // schreiber 84
-    // - geometry
-    //   - angles: these are connected, see documentation
-    const scalar betas     = 138.51 * Foam::constant::mathematical::pi/180;
-    const scalar gamma_c   = Foam::constant::mathematical::pi - betas ;
-    const scalar gamma     = betas - Foam::constant::mathematical::pi/2;
-
-    //   - lengths 
-    const scalar trueChord  = 0.09;
-    const scalar pitch      = trueChord*0.621; // not neccessarily, property of the DLR cascade
-
-    const scalar axialChord = trueChord*sin(gamma_c);
-    */
 
     // kobra
     // - geometry
@@ -49,7 +35,7 @@ distribution
     const scalar axialChord = trueChord*sin(gamma_c);
 
     // - distribution
-    const int    typeDf   =  1;
+    const int    typeDf   =  3;
     const scalar a        = -0.25;
     const scalar b        =  1.25;
     const scalar c        =  1e-3; // minimum distance from the wall for non zero fluxes
@@ -58,77 +44,96 @@ distribution
     const scalar dist_max = b*axialChord;   
   #};
   codeWrite
-  #{
-      const volVectorField& cCenters = mesh().C(); 
-      volScalarField distribution
-      (
-        IOobject
-      (
-        "distribution",
-        "constant",
-        mesh(),
-        IOobject::NO_READ,
-        IOobject::AUTO_WRITE
-      ),
-        mesh(),
-        dimensionedScalar("distribution", dimless, 0.0)
-      );
+  #{  
+    // create field distribution, initialize as field of zeros
+    volScalarField distribution
+    (
+      IOobject
+    (
+      "distribution",
+      "constant",
+      mesh(),
+      IOobject::NO_READ,
+      IOobject::AUTO_WRITE
+    ),
+      mesh(),
+      dimensionedScalar("distribution", dimless, 0.0)
+    );
 
-      volScalarField wallDistance
-      (
-        IOobject
-      (
-        "wallDistance",
-        mesh().time().timeName(),
-        mesh(),
-        IOobject::NO_READ,
-        IOobject::AUTO_WRITE
-      ),
-        mesh(),
-        dimensionedScalar("wallDistance", dimensionSet(0,1,0,0,0,0,0), 0)
-      );
+    // get wall distance of the cells
+    const volScalarField  wallDistance = wallDist(mesh()).y();
 
-      wallDistance = wallDist(mesh()).y();
+    // get centroids of the cells
+    const volVectorField& cCenters = mesh().C();
 
-      forAll(cCenters, cellI)
+    // transform [x,y] of centroids to [ax,tan] system 
+    // (rotate by -gamma, but we want only the first component)
+    const volScalarField axialPosition = cos(gamma) * cCenters.component(vector::X) + sin(gamma) * cCenters.component(vector::Y);
+
+    // lambda function to asses if cell of given index is at required position
+    auto desiredPosition = [&](int cellIndex) 
+    {       
+      return axialPosition[cellIndex] >= dist_min && axialPosition[cellIndex] <= dist_max && wallDistance[cellIndex] > c ; 
+    } ; 
+
+    switch(typeDf) 
+    {
+      case 1: 
       {
-        scalar x = cCenters[cellI][0];
-        scalar y = cCenters[cellI][1];
-        // rotate from x,y to ax,tan (= x_ax, y_ax)
-        scalar x_ax = cos(gamma) * x + sin(gamma) * y;
-
-        if (   x_ax >= dist_min && x_ax <= dist_max && wallDistance[cellI] > 1e-3 ) 
+        // distribution is binary 0/1, 
+        // 1 where desiredPosition == True, else 0 
+        forAll(cCenters, cellI)
         {
-          switch(typeDf) {
-          case 1:
-            distribution[cellI] =  1.0;
-            break;
-          case 2: {
-            const volScalarField& p_case2 = mesh().lookupObject<volScalarField>("p");
-            if ( p_case2[cellI] > isenTotPressure *pow(2/(1+ratioSpecHeats), ratioSpecHeats/(ratioSpecHeats-1)) ){
-              distribution[cellI] =  1.0;
-            }
-            break;
-            }
-          case 3:{
-            const volScalarField& p = mesh().lookupObject<volScalarField>("p");
-            volScalarField::Boundary& pb = const_cast<volScalarField*>(&p)->boundaryFieldRef();
-  
-            label inletId = mesh().boundaryMesh().findPatchID("inlet");
-            label outletId = mesh().boundaryMesh().findPatchID("outlet");
-            
-            const scalarField& magSfIn  = mesh().magSf().boundaryField()[ inletId];
-            const scalarField& magSfOut = mesh().magSf().boundaryField()[outletId];
-  
-            const scalar p1 = gSum(pb[ inletId]*magSfIn )/gSum(magSfIn );
-            const scalar p2 = gSum(pb[outletId]*magSfOut)/gSum(magSfOut);
-            distribution[cellI] =  (p[cellI] - p1)/(p2-p1);
-            break;
-            }
-          }         
-        }
+          if ( desiredPosition( cellI ) ) 
+          {
+             distribution[cellI] =  1.0;  
+          }
+         }
+        break;
       }
-      distribution.write();
-      Info << "Distribution was computed and written." << endl;
+      case 2: 
+      {
+        // distribution is binary 0/1, 
+        // 1 where desiredPosition == True i and (isentropically) subsonic, else 0
+        const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+        const scalar p_crit = isenTotPressure *pow(2/(1+ratioSpecHeats), ratioSpecHeats/(ratioSpecHeats-1));
+        forAll(cCenters, cellI)
+        {
+          if ( desiredPosition( cellI ) && p[cellI] > p_crit ) 
+          {
+             distribution[cellI] =  1.0;  
+          }
+        }
+        break;
+      }
+      case 3:
+      {
+        // distribution is not binary
+        // (p-p_in)/(p_out-p_in) where desiredPosition == True, else 0
+
+        const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+        volScalarField::Boundary& pb = const_cast<volScalarField*>(&p)->boundaryFieldRef();
+        label inletId = mesh().boundaryMesh().findPatchID("inlet");
+        label outletId = mesh().boundaryMesh().findPatchID("outlet");
+        
+        const scalarField& magSfIn  = mesh().magSf().boundaryField()[ inletId];
+        const scalarField& magSfOut = mesh().magSf().boundaryField()[outletId];
+
+        const scalar p1 = gSum(pb[ inletId]*magSfIn )/gSum(magSfIn );
+        const scalar p2 = gSum(pb[outletId]*magSfOut)/gSum(magSfOut);
+
+        forAll(cCenters, cellI)
+        {
+          if ( desiredPosition( cellI ) ) 
+          {
+             distribution[cellI] =  (p[cellI] - p1)/(p2-p1); 
+          }
+        }
+        break;
+      }
+    }   
+
+    distribution.write();
+    Info << "Distribution was computed and written." << endl;
   #};
 }
