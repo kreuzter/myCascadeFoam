@@ -35,7 +35,7 @@ distribution
     const scalar axialChord = trueChord*sin(gamma_c);
 
     // - distribution
-    const int    typeDf   =  3;
+    const int    typeDf   =  1;
     const scalar a        = -0.25;
     const scalar b        =  1.25;
     const scalar c        =  1e-3; // minimum distance from the wall for non zero fluxes
