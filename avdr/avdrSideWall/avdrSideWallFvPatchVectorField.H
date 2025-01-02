@@ -29,7 +29,7 @@ Description
 
 Example
 
-    inlet
+    front
     {
         type            avdrSideWall;
         avdr            1.1;
