@@ -51,7 +51,7 @@ distribution
       IOobject
     (
       "distribution",
-      "constant",
+      "0",
       mesh(),
       IOobject::NO_READ,
       IOobject::AUTO_WRITE
@@ -71,7 +71,7 @@ distribution
     const volScalarField axialPosition = cos(gamma) * cCenters.component(vector::X) + sin(gamma) * cCenters.component(vector::Y);
 
     // lambda function to asses if cell of given index is at required position
-    auto desiredPosition = [&](int cellIndex) 
+    auto desiredPosition = [&](int cellIndex) -> bool
     {       
       return axialPosition[cellIndex] >= dist_min && axialPosition[cellIndex] <= dist_max && wallDistance[cellIndex] > c ; 
     } ; 
@@ -94,14 +94,14 @@ distribution
       case 2: 
       {
         // distribution is binary 0/1, 
-        // 1 where desiredPosition == True i and (isentropically) subsonic, else 0
+        // 1 where desiredPosition == True and (isentropically) subsonic, else 0
         const volScalarField& p = mesh().lookupObject<volScalarField>("p");
         const scalar p_crit = isenTotPressure *pow(2/(1+ratioSpecHeats), ratioSpecHeats/(ratioSpecHeats-1));
         forAll(cCenters, cellI)
         {
           if ( desiredPosition( cellI ) && p[cellI] > p_crit ) 
           {
-             distribution[cellI] =  1.0;  
+             distribution[cellI] = 1.0;  
           }
         }
         break;
@@ -126,7 +126,7 @@ distribution
         {
           if ( desiredPosition( cellI ) ) 
           {
-             distribution[cellI] =  (p[cellI] - p1)/(p2-p1); 
+             distribution[cellI] = (p[cellI] - p1)/(p2-p1); 
           }
         }
         break;
