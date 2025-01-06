@@ -132,7 +132,7 @@ void Foam::avdrSideWallFvPatchVectorField::updateCoeffs()
     IOobject
   (
     "distribution",
-    "0",
+    "system",
     mesh,
     IOobject::MUST_READ, //READ_IF_PRESENT,
     IOobject::AUTO_WRITE

@@ -51,7 +51,7 @@ distribution
       IOobject
     (
       "distribution",
-      "0",
+      "system",
       mesh(),
       IOobject::NO_READ,
       IOobject::AUTO_WRITE
